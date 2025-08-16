@@ -65,3 +65,15 @@ Contraseña: la que pusiste en la configuración de Samba.
 Si todo sale bien, te dirá Bienvenido al dominio.
 
 Reinicia Windows.
+[global]  
+   workgroup = TETERETERE  
+   realm = TETERETERE.LOCAL  
+   server role = active directory domain controller  
+   dns forwarder = 8.8.8.8  
+   idmap_ldb:use rfc2307 = yes  
+[sysvol]  
+   path = /var/lib/samba/sysvol  
+   read only = No  
+[netlogon]  
+   path = /var/lib/samba/sysvol/teteretere.local/scripts  
+   read only = No  
