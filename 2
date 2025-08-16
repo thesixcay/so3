@@ -1,0 +1,28 @@
+# --- 1. ACTUALIZAR EL SISTEMA ---
+sudo apt-get update && sudo apt-get upgrade -y
+
+# --- 2. CONFIGURAR EL NOMBRE DEL HOST (MODIFICAR SEGÚN TU CASO) ---
+sudo hostnamectl set-hostname parrot-dc.su-dominio.local
+
+# --- 3. INSTALAR SAMBA Y DEPENDENCIAS ---
+# Durante la instalación, introduce el nombre de tu dominio en MAYÚSCULAS como "Realm"
+sudo apt-get install samba krb5-config winbind smbclient -y
+
+# --- 4. MOVER CONFIGURACIÓN ANTIGUA Y PROVISIONAR EL DOMINIO (ESTE PASO ES INTERACTIVO) ---
+sudo mv /etc/samba/smb.conf /etc/samba/smb.conf.original
+sudo samba-tool domain provision --use-rfc2307 --interactive
+
+# --- 5. COPIAR LA CONFIGURACIÓN DE KERBEROS ---
+sudo cp /var/lib/samba/private/krb5.conf /etc/
+
+# --- 6. DETENER Y DESHABILITAR SERVICIOS ANTIGUOS ---
+sudo systemctl stop smbd nmbd winbind
+sudo systemctl disable smbd nmbd winbind
+
+# --- 7. HABILITAR E INICIAR EL NUEVO SERVICIO DE CONTROLADOR DE DOMINIO ---
+sudo systemctl unmask samba-ad-dc
+sudo systemctl start samba-ad-dc
+sudo systemctl enable samba-ad-dc
+
+# --- 8. CREAR EL USUARIO "teteretere" (SE TE PEDIRÁ UNA CONTRASEÑA) ---
+sudo samba-tool user create teteretere
