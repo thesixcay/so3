@@ -1,0 +1,101 @@
+#!/bin/bash
+# Script para configurar Samba como Controlador de Dominio (Automatizado)
+# Ejecutar como root o con sudo
+
+DOMAIN="TETERETERE.LOCAL"
+HOSTNAME="parrot"  # Cambiar al hostname de tu servidor
+ADMIN_PASS="P@ssw0rd"  # Cambiar por una contraseña segura
+
+# --- 1. Instalar paquetes necesarios ---
+echo "[+] Instalando paquetes..."
+apt update && apt install -y samba krb5-config winbind libpam-winbind libnss-winbind ntp
+
+# --- 2. Configurar Kerberos (krb5.conf) ---
+echo "[+] Configurando Kerberos..."
+cat > /etc/krb5.conf << EOF
+[libdefaults]
+    default_realm = ${DOMAIN}
+    dns_lookup_realm = false
+    dns_lookup_kdc = true
+    ticket_lifetime = 24h
+    renew_lifetime = 7d
+
+[realms]
+    ${DOMAIN} = {
+        kdc = ${HOSTNAME}.${DOMAIN}
+        admin_server = ${HOSTNAME}.${DOMAIN}
+    }
+
+[domain_realm]
+    .${DOMAIN,,} = ${DOMAIN}
+    ${DOMAIN,,} = ${DOMAIN}
+EOF
+
+# --- 3. Configurar Samba (smb.conf) ---
+echo "[+] Configurando Samba..."
+cat > /etc/samba/smb.conf << EOF
+[global]
+    workgroup = ${DOMAIN%%.*}
+    realm = ${DOMAIN}
+    netbios name = ${HOSTNAME^^}
+    server role = active directory domain controller
+    dns backend = SAMBA_INTERNAL
+    dns forwarder = 8.8.8.8
+    idmap_ldb:use rfc2307 = yes
+    idmap config * : backend = tdb
+    idmap config * : range = 3000-7999
+    idmap config ${DOMAIN%%.*} : backend = rid
+    idmap config ${DOMAIN%%.*} : range = 10000-999999
+    log level = 2
+    log file = /var/log/samba/log.%m
+
+[sysvol]
+    path = /var/lib/samba/sysvol
+    read only = No
+
+[netlogon]
+    path = /var/lib/samba/sysvol/${DOMAIN,,}/scripts
+    read only = No
+EOF
+
+# --- 4. Inicializar dominio ---
+echo "[+] Inicializando dominio..."
+samba-tool domain provision \
+    --use-rfc2307 \
+    --realm=${DOMAIN} \
+    --domain=${DOMAIN%%.*} \
+    --server-role=dc \
+    --dns-backend=SAMBA_INTERNAL \
+    --adminpass=${ADMIN_PASS}
+
+# --- 5. Configurar DNS local ---
+echo "[+] Configurando DNS..."
+echo "nameserver 127.0.0.1" > /etc/resolv.conf
+echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+
+# --- 6. Reiniciar servicios ---
+echo "[+] Reiniciando servicios..."
+systemctl stop smbd nmbd winbind
+systemctl unmask samba-ad-dc
+systemctl enable samba-ad-dc
+systemctl start samba-ad-dc
+
+# --- 7. Crear usuario del dominio ---
+echo "[+] Creando usuario 'teteretere'..."
+samba-tool user create teteretere --given-name=Tete --surname=Tere --random-password
+samba-tool group addmembers "Domain Admins" teteretere
+
+# --- 8. Configurar firewall ---
+echo "[+] Configurando firewall..."
+ufw allow 53,88,135,139,389,445,464,636/tcp
+ufw allow 53,88,123,137,138,389,464/udp
+
+# --- 9. Sincronizar hora ---
+echo "[+] Sincronizando hora..."
+systemctl restart ntp
+
+echo -e "\n[+] ¡Configuración completada!"
+echo "Dominio: ${DOMAIN}"
+echo "Hostname: ${HOSTNAME}"
+echo "Contraseña de administrador: ${ADMIN_PASS}"
+echo "Usuario creado: teteretere"
