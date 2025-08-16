@@ -75,5 +75,18 @@ Reinicia Windows.
    path = /var/lib/samba/sysvol  
    read only = No  
 [netlogon]  
+=============================
+
+sudo systemctl start samba-ad-dc.service winbind.service  
+sudo systemctl enable samba-ad-dc.service winbind.service  
    path = /var/lib/samba/sysvol/teteretere.local/scripts  
    read only = No  
+[libdefaults]
+    default_realm = TETERETERE.LOCAL
+    dns_lookup_realm = false
+    dns_lookup_kdc = true
+
+    [libdefaults]
+    default_realm = TETERETERE.LOCAL
+    dns_lookup_realm = false
+    dns_lookup_kdc = true
