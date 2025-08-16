@@ -1,85 +1,67 @@
-linux
-# --- 1. ACTUALIZAR EL SISTEMA ---
-sudo apt-get update && sudo apt-get upgrade -y
+sudo apt update
+sudo apt install samba samba-common smbclient winbind libnss-winbind libpam-winbind krb5-user
 
-# --- 2. CONFIGURAR EL NOMBRE DEL HOST (MODIFICAR SEGÚN TU CASO) ---
-sudo hostnamectl set-hostname parrot-dc.su-dominio.local
+MI-DOMINIO.LOCAL
 
-# --- 3. INSTALAR SAMBA Y DEPENDENCIAS ---
-# Durante la instalación, introduce el nombre de tu dominio en MAYÚSCULAS como "Realm"
-sudo apt-get install samba krb5-config winbind smbclient -y
+127.0.0.1
+127.0.0.1
 
-# --- 4. MOVER CONFIGURACIÓN ANTIGUA Y PROVISIONAR EL DOMINIO (ESTE PASO ES INTERACTIVO) ---
-sudo mv /etc/samba/smb.conf /etc/samba/smb.conf.original
-sudo samba-tool domain provision --use-rfc2es07 --interactive
-
-# --- 5. COPIAR LA CONFIGURACIÓN DE KERBEROS ---
-sudo cp /var/lib/samba/private/krb5.conf /etc/
-
-# --- 6. DETENER Y DESHABILITAR SERVICIOS ANTIGUOS ---
 sudo systemctl stop smbd nmbd winbind
 sudo systemctl disable smbd nmbd winbind
 
-# --- 7. HABILITAR E INICIAR EL NUEVO SERVICIO DE CONTROLADOR DE DOMINIO ---
-sudo systemctl unmask samba-ad-dc
-sudo systemctl start samba-ad-dc
-sudo systemctl enable samba-ad-dc
+sudo mv /etc/samba/smb.conf /etc/samba/smb.conf.back
 
-# --- 8. CREAR EL USUARIO "teteretere" (SE TE PEDIRÁ UNA CONTRASEÑA) ---
+sudo samba-tool domain provision --use-rfc2307 --interactive
+
+Te pedirá:
+
+Realm: en mayúsculas (ej: MI-DOMINIO.LOCAL)
+
+Domain: en minúsculas (ej: mi-dominio)
+
+Server Role: dc
+
+DNS backend: SAMBA_INTERNAL
+
+Administrator password: tu contraseña
+
+3️⃣ Usar la nueva configuración
+
+Edita /etc/krb5.conf y reemplázalo con lo que generó Samba:
+
+sudo cp /var/lib/samba/private/krb5.conf /etc/krb5.conf
+
+Inicia Samba como servicio:
+
+sudo systemctl unmask samba-ad-dc
+sudo systemctl enable samba-ad-dc
+sudo systemctl start samba-ad-dc
+
+4️⃣ Crear el usuario teteretere
+
 sudo samba-tool user create teteretere
 
-windows
+5️⃣ Comprobar que Samba funciona
+host -t SRV _ldap._tcp.mi-dominio.local
+host -t SRV _kerberos._tcp.mi-dominio.local
 
-Parte 2: Pasos en Windows 10 (Cliente)
+6️⃣ Configurar la VM de Windows para unirla al dominio
 
-Estos pasos se realizan en la interfaz gráfica de tu máquina virtual con Windows 10 para unirla al dominio que acabas de crear.
+En Windows (dentro de tu máquina virtual):
 
-1. Configurar el DNS del Cliente:
+Abre Panel de Control → Sistema → Configuración avanzada del sistema → Nombre del equipo.
 
-    Abre la configuración de Red e Internet.
+Haz clic en Cambiar.
 
-    Ve a "Cambiar opciones del adaptador".
+Marca Dominio y escribe:
+mi-dominio.local
 
-    Haz clic derecho en tu conexión de red y selecciona "Propiedades".
+Te pedirá usuario y contraseña de administrador del dominio:
 
-    Selecciona "Protocolo de Internet versión 4 (TCP/IPv4)" y haz clic en "Propiedades".
+Usuario: Administrator
 
-    Elige la opción "Usar las siguientes direcciones de servidor DNS".
+Contraseña: la que pusiste en la configuración de Samba.
 
-    En "Servidor DNS preferido", introduce la dirección IP de tu máquina virtual Parrot OS.
+Si todo sale bien, te dirá Bienvenido al dominio.
 
-    Acepta los cambios.
-
-2. Unir la máquina al dominio:
-
-    Haz clic derecho en el botón de Inicio y selecciona "Sistema".
-
-    Busca la opción "Cambiar nombre de este equipo (avanzado)" o "Configuración avanzada del sistema" y haz clic.
-
-    En la pestaña "Nombre de equipo", haz clic en el botón "Cambiar...".
-
-    En la sección "Miembro de", selecciona "Dominio".
-
-    Escribe el nombre de tu dominio (ej: su-dominio.local).
-
-    Haz clic en "Aceptar".
-
-3. Autenticarse en el dominio:
-
-    Aparecerá una ventana pidiendo credenciales.
-
-    Usuario: Administrator
-
-    Contraseña: La contraseña que estableciste para el Administrador durante el paso de samba-tool domain provision.
-
-    Haz clic en "Aceptar".
-
-4. Reiniciar el equipo:
-
-    Si todo ha ido bien, recibirás un mensaje de bienvenida al dominio.
-
-    El sistema te pedirá que reinicies el equipo para aplicar los cambios. Reinicia.
-
-5. Iniciar sesión con el usuario del dominio:
-
-    Después de reiniciar, en la pantalla de inicio de sesión, podrás acceder con el usuario teteretere y la contraseña que le asignaste en Parrot OS. Puede que necesites seleccionar "Otro usuario" e introducir el nombre de usuario como NOMBREDEDOMINIO\teteretere o teteretere@su-dominio.local.
+Reinicia Windows.
