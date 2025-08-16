@@ -1,0 +1,137 @@
+Configuración de SAMBA como Controlador de Dominio en Parrot OS y Unión de Windows 10
+
+A continuación se detallan los pasos para instalar y configurar un servidor SAMBA como controlador de dominio en una máquina virtual con Parrot OS, crear un usuario y, posteriormente, unir una máquina virtual con Windows 10 a dicho dominio.
+1. Preparación del Entorno en Parrot OS
+
+Antes de instalar SAMBA, es crucial preparar el sistema para asegurar una configuración correcta.
+
+Actualización del sistema:
+Es importante tener todos los paquetes del sistema actualizados. Abra una terminal y ejecute:
+code Bash
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+
+    
+sudo apt-get update
+sudo apt-get upgrade
+
+  
+
+Configuración de red estática:
+Un controlador de dominio necesita una dirección IP estática. Edite el fichero de configuración de red para establecerla. Primero, identifique el nombre de su interfaz de red con ip a. Luego, edite el archivo de configuración correspondiente, que generalmente se encuentra en /etc/network/interfaces o gestionado por NetworkManager.
+
+Configuración del fichero hosts:
+Edite el fichero /etc/hosts para que incluya el nombre de dominio y el nombre del servidor.[1] Por ejemplo:
+code Code
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+
+    
+127.0.0.1       localhost
+<SU_DIRECCIÓN_IP>   parrot-dc.su-dominio.local parrot-dc
+
+  
+
+Reemplace <SU_DIRECCIÓN_IP>, parrot-dc y su-dominio.local con su configuración específica.
+
+Configuración del hostname:
+Asegúrese de que el nombre del host de la máquina coincida con el que ha configurado.
+code Bash
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+
+    
+sudo hostnamectl set-hostname parrot-dc.su-dominio.local
+
+  
+
+2. Instalación de SAMBA y Paquetes Necesarios
+
+Instale SAMBA y otros paquetes requeridos para su funcionamiento como controlador de dominio.[1]
+code Bash
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+
+    
+sudo apt-get install samba krb5-config winbind smbclient
+
+  
+
+Durante la instalación de Kerberos, se le solicitará un "reino" (realm), que debe ser el nombre de su dominio en mayúsculas (ej. SU-DOMINIO.LOCAL).[1] También se le pedirá el nombre de los servidores Kerberos para su reino; introduzca el nombre de su servidor (ej. parrot-dc.su-dominio.local).[1][2]
+3. Configuración de SAMBA como Controlador de Dominio
+
+Una vez instalado, debe provisionar el dominio. Antes de hacerlo, es recomendable renombrar o eliminar el fichero de configuración por defecto de SAMBA.
+code Bash
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+
+    
+sudo mv /etc/samba/smb.conf /etc/samba/smb.conf.original
+
+  
+
+Ahora, utilice la herramienta samba-tool para configurar el dominio de forma interactiva.[3]
+code Bash
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+
+    
+sudo samba-tool domain provision --use-rfc2307 --interactive
+
+  
+
+Se le harán una serie de preguntas, como el nombre del reino (Realm), el nombre de dominio NetBIOS y el rol del servidor (que debe ser dc).[4] Se le pedirá una contraseña para el administrador del dominio.
+
+Una vez finalizado el proceso, se habrá creado un nuevo fichero smb.conf.
+4. Configuración del DNS
+
+Para que los equipos cliente puedan encontrar el controlador de dominio, la resolución DNS es fundamental.
+
+En el servidor Parrot OS:
+Edite el fichero /etc/resolv.conf para que apunte al servidor DNS de SAMBA, que es el propio servidor.
+code Bash
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+
+    
+nameserver 127.0.0.1
+
+  
+
+Es posible que tenga que hacer este cambio persistente para que no se sobrescriba al reiniciar.
+
+Comprobación del servidor DNS:
+Verifique que el servidor DNS está funcionando correctamente.[1]
+code Bash
+IGNORE_WHEN_COPYING_START
+IGNORE_WHEN_COPYING_END
+
+    
+host -t SRV _ldap._tcp.su-dominio.local
+```Este comando debería devolver el nombre y el puerto del servicio LDAP en su controlador de dominio.
+
+#### **5. Creación del Usuario "teteretere"**
+
+Para crear el usuario solicitado en el dominio, utilice el siguiente comando:
+```bash
+sudo samba-tool user create teteretere
+
+  
+
+Se le solicitará una contraseña para el nuevo usuario.
+6. Unión de la Máquina Virtual de Windows 10 al Dominio
+
+Ahora, en la máquina virtual con Windows 10, realice los siguientes pasos:
+
+Configuración de DNS en Windows 10:
+Lo primero es configurar la tarjeta de red de Windows 10 para que utilice el servidor SAMBA como su servidor DNS principal. Para ello, vaya a la configuración de red y en las propiedades del protocolo TCP/IPv4, introduzca la dirección IP de su servidor Parrot OS en el campo "Servidor DNS preferido".
+[3][5]
+Unir al dominio:
+
+    Vaya a "Configuración" > "Cuentas" > "Acceder al trabajo o a la escuela" y seleccione "Conectar".
+    [6]2. Elija la opción "Unir este dispositivo a un dominio de Active Directory local".
+    [6]3. Introduzca el nombre de su dominio (ej. su-dominio.local) y haga clic en "Siguiente".
+    [6]4. Se le pedirán las credenciales de un usuario con permisos para unir equipos al dominio. Utilice el usuario Administrator y la contraseña que estableció durante la provisión de SAMBA.
+    [5]5. Si todo es correcto, recibirá un mensaje de bienvenida al dominio y se le pedirá que reinicie el equipo.
+    [5]
+    Tras reiniciar, podrá iniciar sesión en la máquina Windows 10 con el usuario teteretere que creó en el controlador de dominio SAMBA.
